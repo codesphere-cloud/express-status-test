@@ -65,7 +65,9 @@ const createPage = (statusCode, message = "", useRandomColor = false) => {
     </html>`;
 };
 
-const isValidStatus = (status) => !Number.isNaN(status);
+const isValidStatus = (status) =>
+	!Number.isNaN(status) && status > 0 && status < 1000;
+
 const isStandardStatus = (status) =>
 	status >= MIN_STATUS && status <= MAX_STATUS;
 
@@ -82,7 +84,7 @@ app.get("/:statusCode", (req, res) => {
 
 	if (!isValidStatus(statusCode)) {
 		const errorMessage =
-			"Invalid status code. Please use a number between 100 and 599.";
+			"Invalid status code. Please use a number between 0 and 999.";
 		return res.status(400).send(createPage(400, errorMessage));
 	}
 
