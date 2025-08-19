@@ -1,20 +1,32 @@
 const express = require("express");
-const app = express();
-const PORT = 3000;
 
-const getColor = (status) => {
-	if (status >= 500) return "#d32f2f";
-	if (status >= 400) return "#f57c00";
-	if (status >= 300) return "#1976d2";
-	if (status >= 200) return "#388e3c";
-	return "#546e7a";
+const PORT = 3000;
+const MIN_STATUS = 100;
+const MAX_STATUS = 599;
+
+const STATUS_COLORS = {
+	500: "#d32f2f",
+	400: "#f57c00",
+	300: "#1976d2",
+	200: "#388e3c",
+	100: "#546e7a",
 };
 
-const generateHtml = (statusCode, message = null, randomColor = false) => {
-	const backgroundColor = randomColor ? `hsl(${Math.floor(Math.random() * 360)}, 70%, 45%)` : getColor(statusCode);
-	const messageHtml = message
-		? `<p style="font-size: 2vw; margin-top: 2rem; text-shadow: 2px 2px 5px rgba(0,0,0,0.3);">${message}</p>`
-		: "";
+const getStatusColor = (status) => {
+	for (const threshold of [500, 400, 300, 200, 100]) {
+		if (status >= threshold) return STATUS_COLORS[threshold];
+	}
+	return STATUS_COLORS[100];
+};
+
+const getRandomColor = () =>
+	`hsl(${Math.floor(Math.random() * 360)}, 70%, 45%)`;
+
+const createPage = (statusCode, message = "", useRandomColor = false) => {
+	const backgroundColor = useRandomColor
+		? getRandomColor()
+		: getStatusColor(statusCode);
+	const messageElement = message ? `<p class="message">${message}</p>` : "";
 
 	return `
     <!DOCTYPE html>
@@ -22,9 +34,9 @@ const generateHtml = (statusCode, message = null, randomColor = false) => {
     <head>
         <title>Status ${statusCode}</title>
         <style>
-            body { 
-                background-color: ${backgroundColor}; 
-                color: white; 
+            body {
+                background-color: ${backgroundColor};
+                color: white;
                 font-family: sans-serif;
                 display: flex;
                 flex-direction: column;
@@ -34,54 +46,56 @@ const generateHtml = (statusCode, message = null, randomColor = false) => {
                 margin: 0;
                 text-align: center;
             }
-            h1 { 
-                font-size: 15vw; 
+            h1 {
+                font-size: 15vw;
                 text-shadow: 4px 4px 10px rgba(0,0,0,0.3);
                 margin: 0;
+            }
+            .message {
+                font-size: 2vw;
+                margin-top: 2rem;
+                text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
             }
         </style>
     </head>
     <body>
         <h1>${statusCode}</h1>
-        ${messageHtml}
+        ${messageElement}
     </body>
-    </html>
-  `;
+    </html>`;
 };
+
+const isValidStatus = (status) => !Number.isNaN(status);
+const isStandardStatus = (status) =>
+	status >= MIN_STATUS && status <= MAX_STATUS;
+
+const app = express();
+
+app.get("/", (_, res) => {
+	const welcomeMessage =
+		"Welcome! Try navigating to /200, /404, /500, etc., to test different status codes.";
+	res.status(200).send(createPage(200, welcomeMessage));
+});
 
 app.get("/:statusCode", (req, res) => {
 	const statusCode = parseInt(req.params.statusCode, 10);
 
-	if (Number.isNaN(statusCode)) {
-		return res
-			.status(400)
-			.send(
-				generateHtml(
-					400,
-					"Invalid status code. Please use a number between 100 and 599.",
-				),
-			);
+	if (!isValidStatus(statusCode)) {
+		const errorMessage =
+			"Invalid status code. Please use a number between 100 and 599.";
+		return res.status(400).send(createPage(400, errorMessage));
 	}
-	if (statusCode < 100 || statusCode > 599) {
+
+	if (!isStandardStatus(statusCode)) {
+		const nonStandardMessage = "Non standard status code!";
 		return res
 			.status(statusCode)
-			.send(generateHtml(statusCode, "Non standard status code!", true));
+			.send(createPage(statusCode, nonStandardMessage, true));
 	}
 
-	res.status(statusCode).send(generateHtml(statusCode));
-});
-
-app.get("/", (_, res) => {
-	res
-		.status(200)
-		.send(
-			generateHtml(
-				200,
-				"Welcome! Try navigating to /200, /404, /500, etc., to test different status codes.",
-			),
-		);
+	res.status(statusCode).send(createPage(statusCode));
 });
 
 app.listen(PORT, () => {
-	console.log(` Server running at http://localhost:${PORT}`);
+	console.log(`Server running at http://localhost:${PORT}`);
 });
